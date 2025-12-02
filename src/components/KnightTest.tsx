@@ -37,6 +37,15 @@ const scaleFactors: Record<State, number> = {
   "crouch-attack": 1.8,
 };
 
+// Vertical offset to ground sprites (positive = down)
+const yOffsets: Record<State, number> = {
+  "idle": 20,
+  "run": 0,
+  "attack": 20,
+  "crouch-walk": 35,
+  "crouch-attack": 35,
+};
+
 export const KnightTest = () => {
   const [direction, setDirection] = useState<Direction>("right");
   const [state, setState] = useState<State>("idle");
@@ -46,6 +55,7 @@ export const KnightTest = () => {
 
   const currentAnimation = animations[`${state}-${direction}`];
   const currentScale = scaleFactors[state];
+  const currentYOffset = yOffsets[state];
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     setKeys((prev) => new Set(prev).add(e.key.toLowerCase()));
@@ -157,7 +167,7 @@ export const KnightTest = () => {
             className="pixelated"
             style={{ 
               imageRendering: "pixelated",
-              transform: `scale(${currentScale})`,
+              transform: `scale(${currentScale}) translateY(${currentYOffset}px)`,
               transformOrigin: "bottom center",
             }}
           />
