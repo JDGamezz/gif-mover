@@ -28,6 +28,15 @@ const animations: Record<`${State}-${Direction}`, string> = {
   "crouch-attack-left": crouchAttackLeft,
 };
 
+// Scale factors to normalize sprite sizes (running is larger, so scale it down)
+const scaleFactors: Record<State, number> = {
+  "idle": 1.6,
+  "run": 1,
+  "attack": 1.6,
+  "crouch-walk": 1.6,
+  "crouch-attack": 1.8,
+};
+
 export const KnightTest = () => {
   const [direction, setDirection] = useState<Direction>("right");
   const [state, setState] = useState<State>("idle");
@@ -36,6 +45,7 @@ export const KnightTest = () => {
   const [isAttacking, setIsAttacking] = useState(false);
 
   const currentAnimation = animations[`${state}-${direction}`];
+  const currentScale = scaleFactors[state];
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     setKeys((prev) => new Set(prev).add(e.key.toLowerCase()));
@@ -146,9 +156,8 @@ export const KnightTest = () => {
             className="pixelated"
             style={{ 
               imageRendering: "pixelated",
-              width: "128px",
-              height: "128px",
-              objectFit: "fill",
+              transform: `scale(${currentScale})`,
+              transformOrigin: "bottom center",
             }}
           />
         </div>
