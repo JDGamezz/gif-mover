@@ -144,10 +144,11 @@ export const KnightTest = () => {
         
         {/* Character */}
         <div
-          className="absolute bottom-20 transition-none"
+          className="absolute bottom-20 transition-none flex items-end justify-center"
           style={{
             left: `${positionX}%`,
             transform: "translateX(-50%)",
+            height: "150px",
           }}
         >
           <img
