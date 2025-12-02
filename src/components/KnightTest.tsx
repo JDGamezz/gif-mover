@@ -140,12 +140,14 @@ export const KnightTest = () => {
             transform: "translateX(-50%)",
           }}
         >
-          <img
-            src={currentAnimation}
-            alt={`Knight ${state} ${direction}`}
-            className="w-32 h-32 object-contain pixelated"
-            style={{ imageRendering: "pixelated" }}
-          />
+          <div className="w-24 h-24 flex items-end justify-center overflow-hidden">
+            <img
+              src={currentAnimation}
+              alt={`Knight ${state} ${direction}`}
+              className="max-w-full max-h-full object-contain pixelated scale-150"
+              style={{ imageRendering: "pixelated" }}
+            />
+          </div>
         </div>
       </main>
 
