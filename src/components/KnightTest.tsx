@@ -31,7 +31,7 @@ const animations: Record<`${State}-${Direction}`, string> = {
 // Scale factors to normalize sprite sizes (running is larger, so scale it down)
 const scaleFactors: Record<State, number> = {
   "idle": 1.6,
-  "run": 1,
+  "run": 2,
   "attack": 1.6,
   "crouch-walk": 1.6,
   "crouch-attack": 1.8,
