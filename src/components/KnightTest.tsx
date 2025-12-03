@@ -53,7 +53,7 @@ interface Enemy {
 }
 
 const SPAWN_POSITIONS = [10, 90]; // Fixed spawn positions (left and right)
-const ATTACK_RANGE = 8; // Attack range in percentage
+const ATTACK_RANGE = 15; // Attack range in percentage (sword reach)
 
 export const KnightTest = () => {
   const [direction, setDirection] = useState<Direction>("right");
