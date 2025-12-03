@@ -42,8 +42,8 @@ const yOffsets: Record<State, number> = {
   "idle": 30,
   "run": 0,
   "attack": 30,
-  "crouch-walk": 24,
-  "crouch-attack": 24,
+  "crouch-walk": 20,
+  "crouch-attack": 20,
 };
 
 export const KnightTest = () => {
