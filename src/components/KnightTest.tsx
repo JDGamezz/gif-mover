@@ -53,6 +53,7 @@ interface Enemy {
 }
 
 const SPAWN_POSITIONS = [10, 90]; // Fixed spawn positions (left and right)
+const ATTACK_RANGE = 8; // Attack range in percentage
 
 export const KnightTest = () => {
   const [direction, setDirection] = useState<Direction>("right");
@@ -67,15 +68,43 @@ export const KnightTest = () => {
   const currentScale = scaleFactors[state];
   const currentYOffset = yOffsets[state];
 
+  // Spawn enemy function
+  const spawnEnemy = useCallback(() => {
+    const spawnX = SPAWN_POSITIONS[Math.floor(Math.random() * SPAWN_POSITIONS.length)];
+    const newEnemy: Enemy = {
+      id: enemyIdRef.current++,
+      x: spawnX,
+      speed: 0.3 + Math.random() * 0.2,
+    };
+    setEnemies((prev) => [...prev, newEnemy]);
+  }, []);
+
+  // Kill enemies in range when attacking
+  const killEnemiesInRange = useCallback(() => {
+    setEnemies((prev) =>
+      prev.filter((enemy) => {
+        const distance = Math.abs(enemy.x - positionX);
+        const inFront = direction === "right" ? enemy.x > positionX : enemy.x < positionX;
+        return !(distance < ATTACK_RANGE && inFront);
+      })
+    );
+  }, [positionX, direction]);
+
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     setKeys((prev) => new Set(prev).add(e.key.toLowerCase()));
+    
+    // Spawn enemy on E
+    if (e.key.toLowerCase() === "e") {
+      spawnEnemy();
+    }
     
     // Attack on space
     if (e.key === " " && !isAttacking) {
       setIsAttacking(true);
+      killEnemiesInRange();
       setTimeout(() => setIsAttacking(false), 400);
     }
-  }, [isAttacking]);
+  }, [isAttacking, spawnEnemy, killEnemiesInRange]);
 
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
     setKeys((prev) => {
@@ -143,24 +172,6 @@ export const KnightTest = () => {
 
     return () => clearInterval(interval);
   }, [keys, isAttacking]);
-
-  // Spawn enemies at fixed positions
-  const spawnEnemy = useCallback(() => {
-    const spawnX = SPAWN_POSITIONS[Math.floor(Math.random() * SPAWN_POSITIONS.length)];
-    const newEnemy: Enemy = {
-      id: enemyIdRef.current++,
-      x: spawnX,
-      speed: 0.3 + Math.random() * 0.2,
-    };
-    setEnemies((prev) => [...prev, newEnemy]);
-  }, []);
-
-  // Initial spawn
-  useEffect(() => {
-    spawnEnemy();
-    const spawnInterval = setInterval(spawnEnemy, 5000);
-    return () => clearInterval(spawnInterval);
-  }, [spawnEnemy]);
 
   // Move enemies toward player
   useEffect(() => {
@@ -258,6 +269,10 @@ export const KnightTest = () => {
             <div className="bg-game-key p-3 rounded text-center">
               <kbd className="text-game-accent font-bold">Space</kbd>
               <p className="text-game-muted mt-1">Attack</p>
+            </div>
+            <div className="bg-game-key p-3 rounded text-center">
+              <kbd className="text-game-accent font-bold">E</kbd>
+              <p className="text-game-muted mt-1">Spawn Enemy</p>
             </div>
           </div>
           <p className="text-game-muted text-xs mt-4 text-center">
