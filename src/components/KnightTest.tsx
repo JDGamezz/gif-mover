@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 // Import all knight animations
 import idleRight from "@/assets/Idle_Animation_Knight_Right.gif";
@@ -46,12 +46,22 @@ const yOffsets: Record<State, number> = {
   "crouch-attack": 20,
 };
 
+interface Enemy {
+  id: number;
+  x: number;
+  speed: number;
+}
+
+const SPAWN_POSITIONS = [10, 90]; // Fixed spawn positions (left and right)
+
 export const KnightTest = () => {
   const [direction, setDirection] = useState<Direction>("right");
   const [state, setState] = useState<State>("idle");
   const [positionX, setPositionX] = useState(50);
   const [keys, setKeys] = useState<Set<string>>(new Set());
   const [isAttacking, setIsAttacking] = useState(false);
+  const [enemies, setEnemies] = useState<Enemy[]>([]);
+  const enemyIdRef = useRef(0);
 
   const currentAnimation = animations[`${state}-${direction}`];
   const currentScale = scaleFactors[state];
@@ -134,6 +144,38 @@ export const KnightTest = () => {
     return () => clearInterval(interval);
   }, [keys, isAttacking]);
 
+  // Spawn enemies at fixed positions
+  const spawnEnemy = useCallback(() => {
+    const spawnX = SPAWN_POSITIONS[Math.floor(Math.random() * SPAWN_POSITIONS.length)];
+    const newEnemy: Enemy = {
+      id: enemyIdRef.current++,
+      x: spawnX,
+      speed: 0.3 + Math.random() * 0.2,
+    };
+    setEnemies((prev) => [...prev, newEnemy]);
+  }, []);
+
+  // Initial spawn
+  useEffect(() => {
+    spawnEnemy();
+    const spawnInterval = setInterval(spawnEnemy, 5000);
+    return () => clearInterval(spawnInterval);
+  }, [spawnEnemy]);
+
+  // Move enemies toward player
+  useEffect(() => {
+    const moveInterval = setInterval(() => {
+      setEnemies((prev) =>
+        prev.map((enemy) => {
+          const direction = positionX > enemy.x ? 1 : -1;
+          return { ...enemy, x: enemy.x + direction * enemy.speed };
+        })
+      );
+    }, 30);
+
+    return () => clearInterval(moveInterval);
+  }, [positionX]);
+
   return (
     <div className="min-h-screen bg-game flex flex-col">
       {/* Header */}
@@ -151,7 +193,29 @@ export const KnightTest = () => {
       <main className="flex-1 relative overflow-hidden">
         {/* Ground line */}
         <div className="absolute bottom-20 left-0 right-0 h-1 bg-game-ground" />
-        
+
+        {/* Enemies */}
+        {enemies.map((enemy) => (
+          <div
+            key={enemy.id}
+            className="absolute bottom-20 transition-none"
+            style={{
+              left: `${enemy.x}%`,
+              transform: "translateX(-50%)",
+            }}
+          >
+            <div 
+              className="w-12 h-16 bg-red-600 border-2 border-red-800 rounded-sm"
+              style={{ imageRendering: "pixelated" }}
+            >
+              <div className="w-full h-4 bg-red-800 mt-2 flex justify-center gap-1">
+                <div className="w-2 h-2 bg-yellow-400 rounded-full" />
+                <div className="w-2 h-2 bg-yellow-400 rounded-full" />
+              </div>
+            </div>
+          </div>
+        ))}
+
         {/* Character */}
         <div
           className="absolute bottom-20 transition-none flex items-end justify-center"
