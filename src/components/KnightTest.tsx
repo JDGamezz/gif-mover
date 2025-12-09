@@ -282,7 +282,7 @@ export const KnightTest = () => {
         {enemies.map((enemy) => (
           <div
             key={enemy.id}
-            className="absolute bottom-20 transition-none"
+            className="absolute bottom-[76px] transition-none"
             style={{
               left: `${enemy.x}%`,
               transform: "translateX(-50%)",
@@ -291,8 +291,8 @@ export const KnightTest = () => {
             <img 
               src={fireEnemy}
               alt="Fire enemy"
-              className="w-16 h-16"
-              style={{ imageRendering: "pixelated", transform: "scale(2)" }}
+              className="w-8 h-8"
+              style={{ imageRendering: "pixelated" }}
             />
           </div>
         ))}
