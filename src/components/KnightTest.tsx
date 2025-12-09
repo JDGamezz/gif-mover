@@ -291,7 +291,7 @@ export const KnightTest = () => {
             <img 
               src={fireEnemy}
               alt="Fire enemy"
-              className="w-8 h-8"
+              className="w-12 h-12"
               style={{ imageRendering: "pixelated" }}
             />
           </div>
