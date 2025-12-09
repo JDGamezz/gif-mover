@@ -11,6 +11,7 @@ import crouchWalkRight from "@/assets/Crouch_Walking_Right.gif";
 import crouchWalkLeft from "@/assets/Crouch_Walking_Left.gif";
 import crouchAttackRight from "@/assets/Crouch_Attack_Right.gif";
 import crouchAttackLeft from "@/assets/Crouch_Attack_Left.gif";
+import fireEnemy from "@/assets/fire-enemy.gif";
 
 type Direction = "left" | "right";
 type State = "idle" | "run" | "attack" | "crouch-walk" | "crouch-attack";
@@ -287,15 +288,12 @@ export const KnightTest = () => {
               transform: "translateX(-50%)",
             }}
           >
-            <div 
-              className="w-12 h-16 bg-red-600 border-2 border-red-800 rounded-sm"
-              style={{ imageRendering: "pixelated" }}
-            >
-              <div className="w-full h-4 bg-red-800 mt-2 flex justify-center gap-1">
-                <div className="w-2 h-2 bg-yellow-400 rounded-full" />
-                <div className="w-2 h-2 bg-yellow-400 rounded-full" />
-              </div>
-            </div>
+            <img 
+              src={fireEnemy}
+              alt="Fire enemy"
+              className="w-16 h-16"
+              style={{ imageRendering: "pixelated", transform: "scale(2)" }}
+            />
           </div>
         ))}
 
