@@ -28,6 +28,15 @@ const animations: Record<`${State}-${Direction}`, string> = {
   "crouch-attack-left": crouchAttackLeft,
 };
 
+// Preload all animations to prevent loading delays
+const preloadImages = () => {
+  Object.values(animations).forEach((src) => {
+    const img = new Image();
+    img.src = src;
+  });
+};
+preloadImages();
+
 // Scale factors to normalize sprite sizes (running is larger, so scale it down)
 const scaleFactors: Record<State, number> = {
   "idle": 2,
