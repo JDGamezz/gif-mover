@@ -68,7 +68,7 @@ interface ScorePopup {
 }
 
 const SPAWN_POSITIONS = [10, 90]; // Fixed spawn positions (left and right)
-const ATTACK_RANGE = 15; // Attack range in percentage (sword reach)
+const ATTACK_RANGE = 13; // Attack range in percentage (sword reach)
 const GRAVITY = 1.5;
 const JUMP_FORCE = 18;
 
