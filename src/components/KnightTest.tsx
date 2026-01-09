@@ -15,6 +15,7 @@ import fireEnemy from "@/assets/fire-enemy.gif";
 import candleEnemyLeft from "@/assets/candle_enemy_left.gif";
 import candleEnemyRight from "@/assets/candle_enemy_right.gif";
 import candleEnemyIdle from "@/assets/candle_enemy_idle.gif";
+import gameBackground from "@/assets/game-background.png";
 
 type Direction = "left" | "right";
 type State = "idle" | "run" | "attack" | "crouch-walk" | "crouch-attack";
@@ -40,7 +41,7 @@ const preloadImages = () => {
     const img = new Image();
     img.src = src;
   });
-  [fireEnemy, candleEnemyLeft, candleEnemyRight, candleEnemyIdle].forEach((src) => {
+  [fireEnemy, candleEnemyLeft, candleEnemyRight, candleEnemyIdle, gameBackground].forEach((src) => {
     const img = new Image();
     img.src = src;
   });
@@ -71,6 +72,8 @@ interface Enemy {
   health: number;
   maxHealth: number;
   direction: Direction;
+  knockback: number; // Knockback offset
+  isHurt: boolean; // Flash effect
 }
 
 interface Boss {
@@ -81,6 +84,8 @@ interface Boss {
   direction: Direction;
   isAttacking: boolean;
   attackCooldown: number;
+  knockback: number;
+  isHurt: boolean;
 }
 
 interface ScorePopup {
@@ -91,7 +96,9 @@ interface ScorePopup {
 
 const SPAWN_POSITIONS = [5, 95];
 const ATTACK_RANGE = 13;
-const LEVEL_DURATION = 70; // 1 minute 10 seconds
+const LEVEL_DURATION = 70;
+const KNOCKBACK_FORCE = 8;
+const KNOCKBACK_RECOVERY = 0.3;
 const ENEMY_STATS = {
   fire: { health: 1, points: 10, speed: 0.3 },
   candle: { health: 3, points: 30, speed: 0.2 },
@@ -112,6 +119,7 @@ export const KnightTest = () => {
   const [timeRemaining, setTimeRemaining] = useState(LEVEL_DURATION);
   const [playerHealth, setPlayerHealth] = useState(100);
   const [bossLoopCount, setBossLoopCount] = useState(0);
+  const [backgroundOffset, setBackgroundOffset] = useState(0);
   
   const enemyIdRef = useRef(0);
   const popupIdRef = useRef(0);
@@ -121,11 +129,9 @@ export const KnightTest = () => {
   const currentScale = scaleFactors[state];
   const currentYOffset = yOffsets[state];
 
-  // Get boss health multiplier based on loop count
   const getBossHealthMultiplier = () => 1 + bossLoopCount * 0.5;
   const getBossAggressionMultiplier = () => 1 + bossLoopCount * 0.3;
 
-  // Start game
   const startGame = useCallback(() => {
     setGameState("playing");
     setCurrentLevel(1);
@@ -136,14 +142,13 @@ export const KnightTest = () => {
     setBoss(null);
     setPositionX(50);
     setBossLoopCount(0);
+    setBackgroundOffset(0);
   }, []);
 
-  // Spawn enemy function
   const spawnEnemy = useCallback(() => {
     if (gameState !== "playing") return;
     
     const spawnX = SPAWN_POSITIONS[Math.floor(Math.random() * SPAWN_POSITIONS.length)];
-    // Chance to spawn candle enemy increases with level
     const candleChance = 0.1 + (currentLevel - 1) * 0.1;
     const type: EnemyType = Math.random() < candleChance ? "candle" : "fire";
     const stats = ENEMY_STATS[type];
@@ -156,11 +161,12 @@ export const KnightTest = () => {
       health: stats.health,
       maxHealth: stats.health,
       direction: spawnX < 50 ? "right" : "left",
+      knockback: 0,
+      isHurt: false,
     };
     setEnemies((prev) => [...prev, newEnemy]);
   }, [gameState, currentLevel]);
 
-  // Spawn boss
   const spawnBoss = useCallback(() => {
     const baseHealth = 50 + (currentLevel - 1) * 25;
     const health = Math.floor(baseHealth * getBossHealthMultiplier());
@@ -173,12 +179,12 @@ export const KnightTest = () => {
       direction: "left",
       isAttacking: false,
       attackCooldown: 0,
+      knockback: 0,
+      isHurt: false,
     });
   }, [currentLevel, bossLoopCount]);
 
-  // Attack enemies
   const attackEnemies = useCallback(() => {
-    // Attack regular enemies
     setEnemies((prev) => {
       const newEnemies: Enemy[] = [];
       let totalPoints = 0;
@@ -195,7 +201,20 @@ export const KnightTest = () => {
             totalPoints += points;
             popupsToAdd.push({ x: enemy.x, value: points });
           } else {
-            newEnemies.push({ ...enemy, health: newHealth });
+            // Apply knockback and hurt state
+            const knockbackDir = direction === "right" ? 1 : -1;
+            newEnemies.push({ 
+              ...enemy, 
+              health: newHealth,
+              knockback: KNOCKBACK_FORCE * knockbackDir,
+              isHurt: true,
+            });
+            // Clear hurt state after a short delay
+            setTimeout(() => {
+              setEnemies(e => e.map(en => 
+                en.id === enemy.id ? { ...en, isHurt: false } : en
+              ));
+            }, 150);
           }
         } else {
           newEnemies.push(enemy);
@@ -216,7 +235,6 @@ export const KnightTest = () => {
       return newEnemies;
     });
 
-    // Attack boss
     if (boss) {
       const distance = Math.abs(boss.x - positionX);
       const inFront = direction === "right" ? boss.x > positionX : boss.x < positionX;
@@ -234,10 +252,8 @@ export const KnightTest = () => {
               setScorePopups((p) => p.filter((popup) => popup.id !== popupId));
             }, 800);
             
-            // Level complete
             setTimeout(() => {
               if (currentLevel >= 3) {
-                // Loop bosses after level 3
                 setBossLoopCount((c) => c + 1);
                 setGameState("boss");
                 setCurrentLevel(1);
@@ -248,7 +264,19 @@ export const KnightTest = () => {
             
             return null;
           }
-          return { ...prev, health: newHealth };
+          
+          // Apply knockback to boss
+          const knockbackDir = direction === "right" ? 1 : -1;
+          setTimeout(() => {
+            setBoss(b => b ? { ...b, isHurt: false } : null);
+          }, 150);
+          
+          return { 
+            ...prev, 
+            health: newHealth,
+            knockback: (KNOCKBACK_FORCE * 0.5) * knockbackDir,
+            isHurt: true,
+          };
         });
       }
     }
@@ -281,7 +309,6 @@ export const KnightTest = () => {
 
     setKeys((prev) => new Set(prev).add(e.key.toLowerCase()));
     
-    // Attack on space
     if (e.key === " " && !isAttacking && (gameState === "playing" || gameState === "boss")) {
       setIsAttacking(true);
       attackEnemies();
@@ -313,7 +340,6 @@ export const KnightTest = () => {
     const timer = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev <= 1) {
-          // Time's up, spawn boss
           setGameState("boss");
           spawnBoss();
           return 0;
@@ -332,7 +358,6 @@ export const KnightTest = () => {
       return;
     }
 
-    // Spawn rate increases with level
     const spawnRate = Math.max(800, 2000 - (currentLevel - 1) * 400);
     
     spawnTimerRef.current = setInterval(() => {
@@ -344,7 +369,7 @@ export const KnightTest = () => {
     };
   }, [gameState, currentLevel, spawnEnemy]);
 
-  // Update player state based on keys
+  // Update player state
   useEffect(() => {
     if (gameState !== "playing" && gameState !== "boss") return;
 
@@ -366,7 +391,7 @@ export const KnightTest = () => {
     }
   }, [keys, isAttacking, gameState]);
 
-  // Game loop for movement
+  // Game loop for movement and knockback recovery
   useEffect(() => {
     if (gameState !== "playing" && gameState !== "boss") return;
 
@@ -378,11 +403,32 @@ export const KnightTest = () => {
       if (!isAttacking) {
         if (isMovingLeft) {
           setPositionX((prev) => Math.max(5, prev - (isCrouching ? 0.5 : 1)));
+          // Scroll background
+          setBackgroundOffset((prev) => prev + 2);
         }
         if (isMovingRight) {
           setPositionX((prev) => Math.min(95, prev + (isCrouching ? 0.5 : 1)));
+          // Scroll background
+          setBackgroundOffset((prev) => prev - 2);
         }
       }
+
+      // Recover enemy knockback
+      setEnemies((prev) => prev.map((enemy) => ({
+        ...enemy,
+        x: enemy.x + enemy.knockback,
+        knockback: Math.abs(enemy.knockback) < 0.1 ? 0 : enemy.knockback * (1 - KNOCKBACK_RECOVERY),
+      })));
+
+      // Recover boss knockback
+      setBoss((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          x: Math.max(5, Math.min(95, prev.x + prev.knockback)),
+          knockback: Math.abs(prev.knockback) < 0.1 ? 0 : prev.knockback * (1 - KNOCKBACK_RECOVERY),
+        };
+      });
     }, 30);
 
     return () => clearInterval(interval);
@@ -395,11 +441,14 @@ export const KnightTest = () => {
     const moveInterval = setInterval(() => {
       setEnemies((prev) =>
         prev.map((enemy) => {
+          // Don't move if being knocked back
+          if (Math.abs(enemy.knockback) > 0.5) return enemy;
+          
           const dir = positionX > enemy.x ? 1 : -1;
           const newDirection: Direction = dir > 0 ? "right" : "left";
           return { 
             ...enemy, 
-            x: enemy.x + dir * enemy.speed,
+            x: Math.max(0, Math.min(100, enemy.x + dir * enemy.speed)),
             direction: newDirection,
           };
         })
@@ -435,12 +484,14 @@ export const KnightTest = () => {
       setBoss((prev) => {
         if (!prev) return null;
         
+        // Don't move if being knocked back
+        if (Math.abs(prev.knockback) > 0.5) return prev;
+        
         const dir = positionX > prev.x ? 1 : -1;
         const newDirection: Direction = dir > 0 ? "right" : "left";
         const baseSpeed = 0.15 * getBossAggressionMultiplier();
-        const newX = prev.x + dir * baseSpeed;
+        const newX = Math.max(5, Math.min(95, prev.x + dir * baseSpeed));
         
-        // Check collision with player
         const distance = Math.abs(newX - positionX);
         if (distance < 8) {
           setPlayerHealth((h) => {
@@ -468,9 +519,9 @@ export const KnightTest = () => {
   };
 
   return (
-    <div className="min-h-screen bg-game flex flex-col">
+    <div className="min-h-screen bg-game flex flex-col overflow-hidden">
       {/* HUD */}
-      <header className="p-4 flex justify-between items-center bg-game-panel border-b border-game-border">
+      <header className="p-4 flex justify-between items-center bg-game-panel/90 border-b border-game-border z-50 relative">
         <div className="flex items-center gap-6">
           <div>
             <span className="text-game-muted text-sm">LEVEL</span>
@@ -507,10 +558,42 @@ export const KnightTest = () => {
         </div>
       </header>
 
-      {/* Game Area */}
+      {/* Game Area with Castle Crashers style POV */}
       <main className="flex-1 relative overflow-hidden">
-        {/* Ground line */}
-        <div className="absolute bottom-20 left-0 right-0 h-1 bg-game-ground" />
+        {/* Scrolling Background - Sky layer */}
+        <div 
+          className="absolute inset-0 z-0"
+          style={{
+            backgroundImage: `url(${gameBackground})`,
+            backgroundRepeat: "repeat-x",
+            backgroundSize: "auto 100%",
+            backgroundPosition: `${backgroundOffset * 0.5}px 0`,
+            imageRendering: "pixelated",
+          }}
+        />
+        
+        {/* Scrolling Background - Main layer */}
+        <div 
+          className="absolute inset-0 z-0"
+          style={{
+            backgroundImage: `url(${gameBackground})`,
+            backgroundRepeat: "repeat-x",
+            backgroundSize: "auto 100%",
+            backgroundPosition: `${backgroundOffset}px 0`,
+            imageRendering: "pixelated",
+          }}
+        />
+
+        {/* Floor/Ground area - Castle Crashers style with visible depth */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 z-10">
+          {/* Grass gradient overlay for depth */}
+          <div 
+            className="absolute inset-0"
+            style={{
+              background: "linear-gradient(to bottom, transparent 0%, rgba(34, 139, 34, 0.3) 30%, rgba(34, 139, 34, 0.5) 100%)",
+            }}
+          />
+        </div>
 
         {/* Menu Screen */}
         {gameState === "menu" && (
@@ -563,7 +646,7 @@ export const KnightTest = () => {
         {scorePopups.map((popup) => (
           <div
             key={popup.id}
-            className="absolute bottom-32 text-yellow-400 font-pixel font-bold text-2xl pointer-events-none animate-score-popup"
+            className="absolute bottom-48 text-yellow-400 font-pixel font-bold text-2xl pointer-events-none animate-score-popup z-30"
             style={{
               left: `${popup.x}%`,
               transform: "translateX(-50%)",
@@ -577,10 +660,12 @@ export const KnightTest = () => {
         {enemies.map((enemy) => (
           <div
             key={enemy.id}
-            className="absolute bottom-[76px] transition-none"
+            className="absolute bottom-28 transition-none z-20"
             style={{
               left: `${enemy.x}%`,
-              transform: "translateX(-50%)",
+              transform: `translateX(-50%) ${enemy.isHurt ? 'scale(1.1)' : 'scale(1)'}`,
+              filter: enemy.isHurt ? 'brightness(2) saturate(0.5)' : 'none',
+              transition: 'filter 0.1s, transform 0.1s',
             }}
           >
             {enemy.type === "fire" ? (
@@ -601,7 +686,7 @@ export const KnightTest = () => {
                 {/* Health bar for candle enemies */}
                 <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-gray-700 rounded overflow-hidden">
                   <div 
-                    className="h-full bg-orange-400"
+                    className="h-full bg-orange-400 transition-all duration-100"
                     style={{ width: `${(enemy.health / enemy.maxHealth) * 100}%` }}
                   />
                 </div>
@@ -613,10 +698,12 @@ export const KnightTest = () => {
         {/* Boss */}
         {boss && (
           <div
-            className="absolute bottom-[76px] transition-none"
+            className="absolute bottom-28 transition-none z-20"
             style={{
               left: `${boss.x}%`,
-              transform: "translateX(-50%)",
+              transform: `translateX(-50%) ${boss.isHurt ? 'scale(1.15)' : 'scale(1)'}`,
+              filter: boss.isHurt ? 'brightness(2) saturate(0.5)' : 'none',
+              transition: 'filter 0.1s, transform 0.1s',
             }}
           >
             <img 
@@ -631,7 +718,7 @@ export const KnightTest = () => {
         {/* Character */}
         {(gameState === "playing" || gameState === "boss") && (
           <div
-            className="absolute bottom-20 transition-none flex items-end justify-center"
+            className="absolute bottom-28 transition-none flex items-end justify-center z-20"
             style={{
               left: `${positionX}%`,
               transform: "translateX(-50%)",
@@ -653,7 +740,7 @@ export const KnightTest = () => {
       </main>
 
       {/* Controls */}
-      <footer className="p-4 bg-game-panel border-t border-game-border">
+      <footer className="p-4 bg-game-panel/90 border-t border-game-border z-50 relative">
         <div className="max-w-2xl mx-auto">
           <div className="grid grid-cols-4 gap-4 text-sm">
             <div className="bg-game-key p-2 rounded text-center">
