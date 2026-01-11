@@ -633,7 +633,7 @@ export const KnightTest = () => {
         </div>
         
         <h1 className="text-xl font-bold text-game-text font-pixel tracking-wider">
-          FIRE FIGHTERS
+          FLAME FIGHTERS
         </h1>
         
         <div className="flex items-center gap-6">
@@ -672,7 +672,7 @@ export const KnightTest = () => {
         {/* Menu Screen */}
         {gameState === "menu" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-[250]">
-            <h1 className="text-5xl font-pixel text-game-accent mb-4">FIRE FIGHTERS</h1>
+            <h1 className="text-5xl font-pixel text-game-accent mb-4">FLAME FIGHTERS</h1>
             <p className="text-game-text text-xl mb-8">A Beat 'Em Up Adventure</p>
             <p className="text-game-muted mb-4">Press SPACE or ENTER to start</p>
             <div className="text-game-muted text-sm space-y-1">
