@@ -15,6 +15,7 @@ import fireEnemy from "@/assets/fire-enemy.gif";
 import candleEnemyLeft from "@/assets/candle_enemy_left.gif";
 import candleEnemyRight from "@/assets/candle_enemy_right.gif";
 import candleEnemyIdle from "@/assets/candle_enemy_idle.gif";
+import fireBoss from "@/assets/fire_boss.gif";
 
 // Level backgrounds
 import bgLevel1 from "@/assets/bg_level_1.png";
@@ -25,7 +26,8 @@ import bgBoss from "@/assets/bg_boss.png";
 type Direction = "left" | "right";
 type State = "idle" | "run" | "attack" | "crouch-idle" | "crouch-walk" | "crouch-attack";
 type GameState = "menu" | "playing" | "boss" | "level-complete" | "game-over";
-type EnemyType = "fire" | "candle";
+type EnemyType = "fire";
+type BossType = "candle" | "fire";
 
 const animations: Record<string, string> = {
   "idle-right": idleRight,
@@ -106,6 +108,7 @@ interface Boss {
   knockback: number;
   knockbackY: number;
   isHurt: boolean;
+  type: BossType;
 }
 
 interface ScorePopup {
@@ -116,14 +119,17 @@ interface ScorePopup {
 }
 
 const SPAWN_POSITIONS = [5, 95];
-const ATTACK_RANGE = 13;
-const ATTACK_RANGE_Y = 30; // Y range for isometric attacks
+const ATTACK_RANGE = 18; // Improved sword hitbox
+const ATTACK_RANGE_Y = 40; // Better Y range for isometric attacks
 const LEVEL_DURATION = 70;
 const KNOCKBACK_FORCE = 8;
 const KNOCKBACK_RECOVERY = 0.3;
 const ENEMY_STATS = {
   fire: { health: 1, points: 10, speed: 0.3 },
-  candle: { health: 3, points: 30, speed: 0.2 },
+};
+const BOSS_STATS = {
+  candle: { health: 50, speed: 0.12 }, // Levels 1-3 boss
+  fire: { health: 100, speed: 0.10 },  // Level 4+ boss (double health)
 };
 
 // Isometric play area bounds (Y position in pixels, 0 = bottom, 150 = top of play area)
@@ -186,8 +192,7 @@ export const KnightTest = () => {
     
     const spawnX = SPAWN_POSITIONS[Math.floor(Math.random() * SPAWN_POSITIONS.length)];
     const spawnY = Math.random() * PLAY_AREA_MAX_Y; // Random Y position
-    const candleChance = 0.1 + (currentLevel - 1) * 0.1;
-    const type: EnemyType = Math.random() < candleChance ? "candle" : "fire";
+    const type: EnemyType = "fire"; // Only fire enemies spawn
     const stats = ENEMY_STATS[type];
     
     const newEnemy: Enemy = {
@@ -204,11 +209,13 @@ export const KnightTest = () => {
       isHurt: false,
     };
     setEnemies((prev) => [...prev, newEnemy]);
-  }, [gameState, currentLevel]);
+  }, [gameState]);
 
   const spawnBoss = useCallback(() => {
-    const baseHealth = 50 + (currentLevel - 1) * 25;
-    const health = Math.floor(baseHealth * getBossHealthMultiplier());
+    // Levels 1-3: Candle boss, Level 4+: Fire boss
+    const bossType: BossType = currentLevel >= 4 ? "fire" : "candle";
+    const baseStats = BOSS_STATS[bossType];
+    const health = Math.floor(baseStats.health * getBossHealthMultiplier());
     
     setBoss({
       id: Date.now(),
@@ -222,6 +229,7 @@ export const KnightTest = () => {
       knockback: 0,
       knockbackY: 0,
       isHurt: false,
+      type: bossType,
     });
   }, [currentLevel, bossLoopCount]);
 
@@ -466,12 +474,12 @@ export const KnightTest = () => {
           setBackgroundOffset((prev) => prev - 2);
         }
         
-        // Vertical movement (isometric Y)
+        // Vertical movement (isometric Y) - same speed as horizontal
         if (isMovingUp) {
-          setPositionY((prev) => Math.min(PLAY_AREA_MAX_Y, prev + moveSpeed * 1.5));
+          setPositionY((prev) => Math.min(PLAY_AREA_MAX_Y, prev + moveSpeed));
         }
         if (isMovingDown) {
-          setPositionY((prev) => Math.max(PLAY_AREA_MIN_Y, prev - moveSpeed * 1.5));
+          setPositionY((prev) => Math.max(PLAY_AREA_MIN_Y, prev - moveSpeed));
         }
       }
 
@@ -530,7 +538,7 @@ export const KnightTest = () => {
           const distanceY = Math.abs(enemy.y - positionY);
           if (distanceX < 5 && distanceY < 20) {
             setPlayerHealth((h) => {
-              const newHealth = h - (enemy.type === "candle" ? 2 : 1);
+              const newHealth = h - 1; // Fire enemies do 1 damage
               if (newHealth <= 0) {
                 setGameState("game-over");
                 return 0;
@@ -559,16 +567,17 @@ export const KnightTest = () => {
         const dirX = positionX > prev.x ? 1 : -1;
         const dirY = positionY > prev.y ? 1 : -1;
         const newDirection: Direction = dirX > 0 ? "right" : "left";
-        const baseSpeed = 0.15 * getBossAggressionMultiplier();
+        // Slow boss movement based on type
+        const baseSpeed = BOSS_STATS[prev.type].speed * getBossAggressionMultiplier();
         const newX = Math.max(5, Math.min(95, prev.x + dirX * baseSpeed));
         const newY = Math.max(PLAY_AREA_MIN_Y, Math.min(PLAY_AREA_MAX_Y, prev.y + dirY * baseSpeed * 0.7));
         
         const distanceX = Math.abs(newX - positionX);
         const distanceY = Math.abs(newY - positionY);
-        if (distanceX < 8 && distanceY < 25) {
+        if (distanceX < 10 && distanceY < 30) {
           setPlayerHealth((h) => {
-            const damage = 3 * getBossAggressionMultiplier();
-            const newHealth = h - damage;
+            const damage = prev.type === "fire" ? 5 : 3; // Fire boss does more damage
+            const newHealth = h - damage * getBossAggressionMultiplier();
             if (newHealth <= 0) {
               setGameState("game-over");
               return 0;
@@ -624,7 +633,7 @@ export const KnightTest = () => {
         </div>
         
         <h1 className="text-xl font-bold text-game-text font-pixel tracking-wider">
-          KNIGHT'S FURY
+          FIRE FIGHTERS
         </h1>
         
         <div className="flex items-center gap-6">
@@ -663,7 +672,7 @@ export const KnightTest = () => {
         {/* Menu Screen */}
         {gameState === "menu" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-[250]">
-            <h1 className="text-5xl font-pixel text-game-accent mb-4">KNIGHT'S FURY</h1>
+            <h1 className="text-5xl font-pixel text-game-accent mb-4">FIRE FIGHTERS</h1>
             <p className="text-game-text text-xl mb-8">A Beat 'Em Up Adventure</p>
             <p className="text-game-muted mb-4">Press SPACE or ENTER to start</p>
             <div className="text-game-muted text-sm space-y-1">
@@ -697,7 +706,7 @@ export const KnightTest = () => {
         {boss && gameState === "boss" && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[240]">
             <p className="text-red-400 font-pixel text-center mb-1">
-              BOSS - Level {currentLevel} {bossLoopCount > 0 ? `(Loop ${bossLoopCount})` : ''}
+              {boss.type === "fire" ? "INFERNO LORD" : "CANDLE DEMON"} - Level {currentLevel} {bossLoopCount > 0 ? `(Loop ${bossLoopCount})` : ''}
             </p>
             <div className="w-64 h-6 bg-gray-700 rounded overflow-hidden border-2 border-red-400">
               <div 
@@ -724,7 +733,7 @@ export const KnightTest = () => {
           </div>
         ))}
 
-        {/* Enemies */}
+        {/* Enemies - Only fire enemies spawn during levels */}
         {enemies.map((enemy) => (
           <div
             key={enemy.id}
@@ -738,34 +747,16 @@ export const KnightTest = () => {
               zIndex: getZIndex(enemy.y),
             }}
           >
-            {enemy.type === "fire" ? (
-              <img 
-                src={fireEnemy}
-                alt="Fire enemy"
-                className="w-24 h-24"
-                style={{ imageRendering: "pixelated" }}
-              />
-            ) : (
-              <div className="relative">
-                <img 
-                  src={enemy.direction === "left" ? candleEnemyLeft : candleEnemyRight}
-                  alt="Candle enemy"
-                  className="w-16 h-20"
-                  style={{ imageRendering: "pixelated", transform: "scale(2)" }}
-                />
-                {/* Health bar for candle enemies */}
-                <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-gray-700 rounded overflow-hidden">
-                  <div 
-                    className="h-full bg-orange-400 transition-all duration-100"
-                    style={{ width: `${(enemy.health / enemy.maxHealth) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
+            <img 
+              src={fireEnemy}
+              alt="Fire enemy"
+              className="w-24 h-24"
+              style={{ imageRendering: "pixelated" }}
+            />
           </div>
         ))}
 
-        {/* Boss */}
+        {/* Boss - Candle for L1-3, Fire for L4+ */}
         {boss && (
           <div
             className="absolute transition-none"
@@ -778,12 +769,21 @@ export const KnightTest = () => {
               zIndex: getZIndex(boss.y),
             }}
           >
-            <img 
-              src={boss.direction === "left" ? candleEnemyLeft : candleEnemyRight}
-              alt="Boss"
-              className="w-24 h-32"
-              style={{ imageRendering: "pixelated", transform: "scale(3)" }}
-            />
+            {boss.type === "candle" ? (
+              <img 
+                src={boss.direction === "left" ? candleEnemyLeft : candleEnemyRight}
+                alt="Candle Boss"
+                className="w-32 h-40"
+                style={{ imageRendering: "pixelated", transform: "scale(2.5)" }}
+              />
+            ) : (
+              <img 
+                src={fireBoss}
+                alt="Fire Boss"
+                className="w-40 h-48"
+                style={{ imageRendering: "pixelated", transform: "scale(3)" }}
+              />
+            )}
           </div>
         )}
 
