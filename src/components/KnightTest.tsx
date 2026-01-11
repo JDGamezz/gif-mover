@@ -119,7 +119,7 @@ interface ScorePopup {
 }
 
 const SPAWN_POSITIONS = [5, 95];
-const ATTACK_RANGE = 18; // Improved sword hitbox
+const ATTACK_RANGE = 14; // Improved sword hitbox
 const ATTACK_RANGE_Y = 40; // Better Y range for isometric attacks
 const LEVEL_DURATION = 70;
 const KNOCKBACK_FORCE = 8;
@@ -134,7 +134,7 @@ const BOSS_STATS = {
 
 // Isometric play area bounds (Y position in pixels, 0 = bottom, 150 = top of play area)
 const PLAY_AREA_MIN_Y = 0;
-const PLAY_AREA_MAX_Y = 120;
+const PLAY_AREA_MAX_Y = 110;
 
 export const KnightTest = () => {
   const [direction, setDirection] = useState<Direction>("right");
