@@ -518,7 +518,7 @@ export const KnightTest = () => {
       const isMovingUp = keys.has("arrowup") || keys.has("w");
       const isMovingDown = keys.has("arrowdown") || keys.has("s");
 
-      const moveSpeed = isCrouching ? 0.5 : 1;
+      const moveSpeed = isCrouching ? 0.5 : 1.5;
 
       if (!isAttacking) {
         // Horizontal movement
