@@ -294,61 +294,63 @@ export const KnightTest = () => {
       return newEnemies;
     });
 
-    if (boss) {
-      const distanceX = Math.abs(boss.x - positionX);
-      const distanceY = Math.abs(boss.y - positionY);
-      const inFront = direction === "right" ? boss.x > positionX : boss.x < positionX;
+    // Attack boss using functional update to get current boss state
+    setBoss((currentBoss) => {
+      if (!currentBoss) return null;
+      
+      const distanceX = Math.abs(currentBoss.x - positionX);
+      const distanceY = Math.abs(currentBoss.y - positionY);
+      const inFront = direction === "right" ? currentBoss.x > positionX : currentBoss.x < positionX;
       
       if (distanceX < ATTACK_RANGE && distanceY < ATTACK_RANGE_Y && inFront) {
-        setBoss((prev) => {
-          if (!prev) return null;
-          const newHealth = prev.health - 1;
-          if (newHealth <= 0) {
-            const points = 100 * currentLevel;
-            setScore((s) => s + points);
-            const popupId = popupIdRef.current++;
-            setScorePopups((p) => [...p, { id: popupId, x: prev.x, y: prev.y, value: points }]);
+        const newHealth = currentBoss.health - 1;
+        if (newHealth <= 0) {
+          const points = 100 * currentLevel;
+          setScore((s) => s + points);
+          const popupId = popupIdRef.current++;
+          setScorePopups((p) => [...p, { id: popupId, x: currentBoss.x, y: currentBoss.y, value: points }]);
+          setTimeout(() => {
+            setScorePopups((p) => p.filter((popup) => popup.id !== popupId));
+          }, 800);
+          
+          // Show dissolving animation for candle boss
+          if (currentBoss.type === "candle") {
+            setDefeatedBoss({ type: currentBoss.type, x: currentBoss.x, y: currentBoss.y, timestamp: Date.now() });
             setTimeout(() => {
-              setScorePopups((p) => p.filter((popup) => popup.id !== popupId));
-            }, 800);
-            
-            // Show dissolving animation for candle boss
-            if (prev.type === "candle") {
-              setDefeatedBoss({ type: prev.type, x: prev.x, y: prev.y, timestamp: Date.now() });
-              setTimeout(() => {
-                setDefeatedBoss(null);
-              }, 2000); // Show dissolving for 2 seconds
-            }
-            
-            setTimeout(() => {
-              if (currentLevel >= 3) {
-                setBossLoopCount((c) => c + 1);
-                setGameState("boss");
-                setCurrentLevel(1);
-              } else {
-                setGameState("level-complete");
-              }
-            }, prev.type === "candle" ? 2000 : 500);
-            
-            return null;
+              setDefeatedBoss(null);
+            }, 2000);
           }
           
-          const knockbackDir = direction === "right" ? 1 : -1;
           setTimeout(() => {
-            setBoss(b => b ? { ...b, isHurt: false } : null);
-          }, 150);
+            if (currentLevel >= 3) {
+              setBossLoopCount((c) => c + 1);
+              setGameState("boss");
+              setCurrentLevel(1);
+            } else {
+              setGameState("level-complete");
+            }
+          }, currentBoss.type === "candle" ? 2000 : 500);
           
-          return { 
-            ...prev, 
-            health: newHealth,
-            knockback: (KNOCKBACK_FORCE * 0.5) * knockbackDir,
-            knockbackY: (Math.random() - 0.5) * 2,
-            isHurt: true,
-          };
-        });
+          return null;
+        }
+        
+        const knockbackDir = direction === "right" ? 1 : -1;
+        setTimeout(() => {
+          setBoss(b => b ? { ...b, isHurt: false } : null);
+        }, 150);
+        
+        return { 
+          ...currentBoss, 
+          health: newHealth,
+          knockback: (KNOCKBACK_FORCE * 0.5) * knockbackDir,
+          knockbackY: (Math.random() - 0.5) * 2,
+          isHurt: true,
+        };
       }
-    }
-  }, [positionX, positionY, direction, boss, currentLevel]);
+      
+      return currentBoss;
+    });
+  }, [positionX, positionY, direction, currentLevel]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (gameState === "menu") {
