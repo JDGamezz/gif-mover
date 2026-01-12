@@ -12,9 +12,10 @@ import crouchWalkLeft from "@/assets/Crouch_Walking_Left.gif";
 import crouchAttackRight from "@/assets/Crouch_Attack_Right.gif";
 import crouchAttackLeft from "@/assets/Crouch_Attack_Left.gif";
 import fireEnemy from "@/assets/fire-enemy.gif";
-import candleEnemyLeft from "src/assets/candle_enemy_left.gif@/assets/candle_enemy_idle.gif";
+import candleEnemyLeft from "@/assets/candle_enemy_left.gif";
 import candleEnemyRight from "@/assets/candle_enemy_right.gif";
 import candleEnemyIdle from "@/assets/candle_enemy_idle.gif";
+import candleDissolvingGif from "@/assets/candle_enemy_dissolving.gif";
 import fireBoss from "@/assets/fire_boss.gif";
 
 // Level backgrounds
@@ -22,6 +23,10 @@ import bgLevel1 from "@/assets/bg_level_1.png";
 import bgLevel2 from "@/assets/bg_level_2.png";
 import bgLevel3 from "@/assets/bg_level_3.png";
 import bgBoss from "@/assets/bg_boss.png";
+
+// Music
+import titleMainMusic from "@/assets/title_main_music.webm";
+import bossMusic from "@/assets/boss_music.webm";
 
 type Direction = "left" | "right";
 type State = "idle" | "run" | "attack" | "crouch-idle" | "crouch-walk" | "crouch-attack";
@@ -154,10 +159,13 @@ export const KnightTest = () => {
   const [playerHealth, setPlayerHealth] = useState(100);
   const [bossLoopCount, setBossLoopCount] = useState(0);
   const [backgroundOffset, setBackgroundOffset] = useState(0);
+  const [defeatedBoss, setDefeatedBoss] = useState<{ type: BossType; x: number; y: number } | null>(null);
   
   const enemyIdRef = useRef(0);
   const popupIdRef = useRef(0);
   const spawnTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const mainMusicRef = useRef<HTMLAudioElement | null>(null);
+  const bossMusicRef = useRef<HTMLAudioElement | null>(null);
 
   const currentAnimation = animations[`${state}-${direction}`];
   const currentScale = scaleFactors[state];
@@ -180,6 +188,7 @@ export const KnightTest = () => {
     setPlayerHealth(100);
     setEnemies([]);
     setBoss(null);
+    setDefeatedBoss(null);
     setPositionX(50);
     setPositionY(60);
     setBossLoopCount(0);
@@ -303,6 +312,14 @@ export const KnightTest = () => {
               setScorePopups((p) => p.filter((popup) => popup.id !== popupId));
             }, 800);
             
+            // Show dissolving animation for candle boss
+            if (prev.type === "candle") {
+              setDefeatedBoss({ type: prev.type, x: prev.x, y: prev.y });
+              setTimeout(() => {
+                setDefeatedBoss(null);
+              }, 2000); // Show dissolving for 2 seconds
+            }
+            
             setTimeout(() => {
               if (currentLevel >= 3) {
                 setBossLoopCount((c) => c + 1);
@@ -311,7 +328,7 @@ export const KnightTest = () => {
               } else {
                 setGameState("level-complete");
               }
-            }, 500);
+            }, prev.type === "candle" ? 2000 : 500);
             
             return null;
           }
@@ -388,6 +405,44 @@ export const KnightTest = () => {
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, [handleKeyDown, handleKeyUp]);
+
+  // Music control
+  useEffect(() => {
+    // Initialize audio elements if not already
+    if (!mainMusicRef.current) {
+      mainMusicRef.current = new Audio(titleMainMusic);
+      mainMusicRef.current.loop = true;
+      mainMusicRef.current.volume = 0.5;
+    }
+    if (!bossMusicRef.current) {
+      bossMusicRef.current = new Audio(bossMusic);
+      bossMusicRef.current.loop = true;
+      bossMusicRef.current.volume = 0.6;
+    }
+
+    const mainMusic = mainMusicRef.current;
+    const bossAudio = bossMusicRef.current;
+
+    if (gameState === "menu" || gameState === "playing" || gameState === "level-complete") {
+      // Play main/title music
+      bossAudio.pause();
+      bossAudio.currentTime = 0;
+      mainMusic.play().catch(() => {}); // Catch autoplay restriction
+    } else if (gameState === "boss") {
+      // Play boss music
+      mainMusic.pause();
+      mainMusic.currentTime = 0;
+      bossAudio.play().catch(() => {});
+    } else if (gameState === "game-over") {
+      // Stop all music on game over
+      mainMusic.pause();
+      bossAudio.pause();
+    }
+
+    return () => {
+      // Cleanup on unmount
+    };
+  }, [gameState]);
 
   // Level timer
   useEffect(() => {
@@ -784,6 +839,26 @@ export const KnightTest = () => {
                 style={{ imageRendering: "pixelated", transform: "scale(3)" }}
               />
             )}
+          </div>
+        )}
+
+        {/* Defeated Boss Dissolving Animation */}
+        {defeatedBoss && defeatedBoss.type === "candle" && (
+          <div
+            className="absolute transition-none"
+            style={{
+              left: `${defeatedBoss.x}%`,
+              bottom: `${getBottomPosition(defeatedBoss.y)}px`,
+              transform: `translateX(-50%) scale(${getDepthScale(defeatedBoss.y)})`,
+              zIndex: getZIndex(defeatedBoss.y),
+            }}
+          >
+            <img 
+              src={candleDissolvingGif}
+              alt="Candle Dissolving"
+              className="w-32 h-40"
+              style={{ imageRendering: "pixelated", transform: "scale(2.5)" }}
+            />
           </div>
         )}
 
