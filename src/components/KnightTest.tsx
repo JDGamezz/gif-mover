@@ -159,7 +159,7 @@ export const KnightTest = () => {
   const [playerHealth, setPlayerHealth] = useState(100);
   const [bossLoopCount, setBossLoopCount] = useState(0);
   const [backgroundOffset, setBackgroundOffset] = useState(0);
-  const [defeatedBoss, setDefeatedBoss] = useState<{ type: BossType; x: number; y: number } | null>(null);
+  const [defeatedBoss, setDefeatedBoss] = useState<{ type: BossType; x: number; y: number; timestamp: number } | null>(null);
   
   const enemyIdRef = useRef(0);
   const popupIdRef = useRef(0);
@@ -314,7 +314,7 @@ export const KnightTest = () => {
             
             // Show dissolving animation for candle boss
             if (prev.type === "candle") {
-              setDefeatedBoss({ type: prev.type, x: prev.x, y: prev.y });
+              setDefeatedBoss({ type: prev.type, x: prev.x, y: prev.y, timestamp: Date.now() });
               setTimeout(() => {
                 setDefeatedBoss(null);
               }, 2000); // Show dissolving for 2 seconds
@@ -854,7 +854,7 @@ export const KnightTest = () => {
             }}
           >
             <img 
-              src={candleDissolvingGif}
+              src={`${candleDissolvingGif}?t=${defeatedBoss.timestamp}`}
               alt="Candle Dissolving"
               className="w-32 h-40"
               style={{ imageRendering: "pixelated", transform: "scale(2.5)" }}
