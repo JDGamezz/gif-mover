@@ -67,6 +67,7 @@ const preloadImages = () => {
     img.src = src;
   });
 };
+
 preloadImages();
 
 const scaleFactors: Record<State, number> = {
@@ -167,19 +168,6 @@ export const KnightTest = () => {
   const spawnTimerRef = useRef<NodeJS.Timeout | null>(null);
   const mainMusicRef = useRef<HTMLAudioElement | null>(null);
   const bossMusicRef = useRef<HTMLAudioElement | null>(null);
-  
-  // Refs for smooth animation
-  const keysRef = useRef<Set<string>>(new Set());
-  const positionXRef = useRef(50);
-  const positionYRef = useRef(60);
-  const backgroundOffsetRef = useRef(0);
-  const animationFrameRef = useRef<number | null>(null);
-  const lastTimeRef = useRef(0);
-
-  // Keep refs in sync with state
-  useEffect(() => {
-    keysRef.current = keys;
-  }, [keys]);
 
   const currentAnimation = animations[`${state}-${direction}`];
   const currentScale = scaleFactors[state];
@@ -204,9 +192,6 @@ export const KnightTest = () => {
     setDefeatedBoss(null);
     setPositionX(50);
     setPositionY(60);
-    positionXRef.current = 50;
-    positionYRef.current = 60;
-    backgroundOffsetRef.current = 0;
     setBossLoopCount(0);
     setBackgroundOffset(0);
     setIsCrouching(false);
@@ -259,18 +244,15 @@ export const KnightTest = () => {
   }, [currentLevel, bossLoopCount]);
 
   const attackEnemies = useCallback(() => {
-    const currentPosX = positionXRef.current;
-    const currentPosY = positionYRef.current;
-
     setEnemies((prev) => {
       const newEnemies: Enemy[] = [];
       let totalPoints = 0;
       const popupsToAdd: { x: number; y: number; value: number }[] = [];
 
       prev.forEach((enemy) => {
-        const distanceX = Math.abs(enemy.x - currentPosX);
-        const distanceY = Math.abs(enemy.y - currentPosY);
-        const inFront = direction === "right" ? enemy.x > currentPosX : enemy.x < currentPosX;
+        const distanceX = Math.abs(enemy.x - positionX);
+        const distanceY = Math.abs(enemy.y - positionY);
+        const inFront = direction === "right" ? enemy.x > positionX : enemy.x < positionX;
 
         if (distanceX < ATTACK_RANGE && distanceY < ATTACK_RANGE_Y && inFront) {
           const newHealth = enemy.health - 1;
@@ -313,9 +295,9 @@ export const KnightTest = () => {
     setBoss((currentBoss) => {
       if (!currentBoss) return null;
 
-      const distanceX = Math.abs(currentBoss.x - currentPosX);
-      const distanceY = Math.abs(currentBoss.y - currentPosY);
-      const inFront = direction === "right" ? currentBoss.x > currentPosX : currentBoss.x < currentPosX;
+      const distanceX = Math.abs(currentBoss.x - positionX);
+      const distanceY = Math.abs(currentBoss.y - positionY);
+      const inFront = direction === "right" ? currentBoss.x > positionX : currentBoss.x < positionX;
 
       if (distanceX < ATTACK_RANGE && distanceY < ATTACK_RANGE_Y && inFront) {
         const newHealth = currentBoss.health - 1;
@@ -366,7 +348,7 @@ export const KnightTest = () => {
 
       return currentBoss;
     });
-  }, [direction, currentLevel]);
+  }, [positionX, positionY, direction, currentLevel]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (gameState === "menu") {
@@ -393,11 +375,9 @@ export const KnightTest = () => {
       return;
     }
 
-    const key = e.key.toLowerCase();
-    setKeys((prev) => new Set(prev).add(key));
-    keysRef.current = new Set(keysRef.current).add(key);
+    setKeys((prev) => new Set(prev).add(e.key.toLowerCase()));
 
-    if (key === "c") {
+    if (e.key.toLowerCase() === "c") {
       setIsCrouching((prev) => !prev);
     }
 
@@ -409,13 +389,11 @@ export const KnightTest = () => {
   }, [gameState, isAttacking, startGame, attackEnemies]);
 
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
-    const key = e.key.toLowerCase();
     setKeys((prev) => {
       const next = new Set(prev);
-      next.delete(key);
+      next.delete(e.key.toLowerCase());
       return next;
     });
-    keysRef.current.delete(key);
   }, []);
 
   useEffect(() => {
@@ -427,7 +405,6 @@ export const KnightTest = () => {
     };
   }, [handleKeyDown, handleKeyUp]);
 
-  // Music control
   useEffect(() => {
     if (!mainMusicRef.current) {
       mainMusicRef.current = new Audio(titleMainMusic);
@@ -458,7 +435,6 @@ export const KnightTest = () => {
     }
   }, [gameState]);
 
-  // Level timer
   useEffect(() => {
     if (gameState !== "playing") return;
 
@@ -476,7 +452,6 @@ export const KnightTest = () => {
     return () => clearInterval(timer);
   }, [gameState, spawnBoss]);
 
-  // Enemy spawning
   useEffect(() => {
     if (gameState !== "playing") {
       if (spawnTimerRef.current) clearInterval(spawnTimerRef.current);
@@ -493,7 +468,6 @@ export const KnightTest = () => {
     };
   }, [gameState, currentLevel, spawnEnemy]);
 
-  // Update player state
   useEffect(() => {
     if (gameState !== "playing" && gameState !== "boss") return;
 
@@ -519,71 +493,34 @@ export const KnightTest = () => {
     }
   }, [keys, isAttacking, isCrouching, gameState]);
 
-  // Smooth game loop using requestAnimationFrame
-  useEffect(() => {
-    if (gameState !== "playing" && gameState !== "boss") {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      return;
-    }
-
-    const gameLoop = (timestamp: number) => {
-      if (!lastTimeRef.current) lastTimeRef.current = timestamp;
-      const deltaTime = timestamp - lastTimeRef.current;
-      lastTimeRef.current = timestamp;
-
-      // Normalize to 60fps (16.67ms per frame)
-      const normalizedDelta = deltaTime / 16.67;
-
-      const currentKeys = keysRef.current;
-      const isMovingLeft = currentKeys.has("arrowleft") || currentKeys.has("a");
-      const isMovingRight = currentKeys.has("arrowright") || currentKeys.has("d");
-      const isMovingUp = currentKeys.has("arrowup") || currentKeys.has("w");
-      const isMovingDown = currentKeys.has("arrowdown") || currentKeys.has("s");
-
-      const moveSpeed = (isCrouching ? 0.5 : 1.5) * normalizedDelta;
-
-      if (!isAttacking) {
-        if (isMovingLeft) {
-          positionXRef.current = Math.max(5, positionXRef.current - moveSpeed);
-          backgroundOffsetRef.current += 2 * normalizedDelta;
-        }
-        if (isMovingRight) {
-          positionXRef.current = Math.min(95, positionXRef.current + moveSpeed);
-          backgroundOffsetRef.current -= 2 * normalizedDelta;
-        }
-        if (isMovingUp) {
-          positionYRef.current = Math.min(PLAY_AREA_MAX_Y, positionYRef.current + moveSpeed);
-        }
-        if (isMovingDown) {
-          positionYRef.current = Math.max(PLAY_AREA_MIN_Y, positionYRef.current - moveSpeed);
-        }
-      }
-
-      // Update state at 60fps rate
-      setPositionX(positionXRef.current);
-      setPositionY(positionYRef.current);
-      setBackgroundOffset(backgroundOffsetRef.current);
-
-      animationFrameRef.current = requestAnimationFrame(gameLoop);
-    };
-
-    animationFrameRef.current = requestAnimationFrame(gameLoop);
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [gameState, isAttacking, isCrouching]);
-
-  // Enemy and knockback updates
   useEffect(() => {
     if (gameState !== "playing" && gameState !== "boss") return;
 
     const interval = setInterval(() => {
-      // Recover enemy knockback
+      const isMovingLeft = keys.has("arrowleft") || keys.has("a");
+      const isMovingRight = keys.has("arrowright") || keys.has("d");
+      const isMovingUp = keys.has("arrowup") || keys.has("w");
+      const isMovingDown = keys.has("arrowdown") || keys.has("s");
+
+      const moveSpeed = isCrouching ? 0.5 : 1.5;
+
+      if (!isAttacking) {
+        if (isMovingLeft) {
+          setPositionX((prev) => Math.max(5, prev - moveSpeed));
+          setBackgroundOffset((prev) => prev + 2);
+        }
+        if (isMovingRight) {
+          setPositionX((prev) => Math.min(95, prev + moveSpeed));
+          setBackgroundOffset((prev) => prev - 2);
+        }
+        if (isMovingUp) {
+          setPositionY((prev) => Math.min(PLAY_AREA_MAX_Y, prev + moveSpeed));
+        }
+        if (isMovingDown) {
+          setPositionY((prev) => Math.max(PLAY_AREA_MIN_Y, prev - moveSpeed));
+        }
+      }
+
       setEnemies((prev) =>
         prev.map((enemy) => ({
           ...enemy,
@@ -594,7 +531,6 @@ export const KnightTest = () => {
         }))
       );
 
-      // Recover boss knockback
       setBoss((prev) => {
         if (!prev) return null;
         return {
@@ -608,22 +544,18 @@ export const KnightTest = () => {
     }, 30);
 
     return () => clearInterval(interval);
-  }, [gameState]);
+  }, [keys, isAttacking, isCrouching, gameState]);
 
-  // Move enemies toward player
   useEffect(() => {
     if (gameState !== "playing" && gameState !== "boss") return;
 
     const moveInterval = setInterval(() => {
-      const currentPosX = positionXRef.current;
-      const currentPosY = positionYRef.current;
-
       setEnemies((prev) =>
         prev.map((enemy) => {
           if (Math.abs(enemy.knockback) > 0.5 || Math.abs(enemy.knockbackY) > 0.5) return enemy;
 
-          const dirX = currentPosX > enemy.x ? 1 : -1;
-          const dirY = currentPosY > enemy.y ? 1 : -1;
+          const dirX = positionX > enemy.x ? 1 : -1;
+          const dirY = positionY > enemy.y ? 1 : -1;
           const newDirection: Direction = dirX > 0 ? "right" : "left";
 
           return {
@@ -635,11 +567,10 @@ export const KnightTest = () => {
         })
       );
 
-      // Check collision with player
       setEnemies((prev) => {
         prev.forEach((enemy) => {
-          const distanceX = Math.abs(enemy.x - currentPosX);
-          const distanceY = Math.abs(enemy.y - currentPosY);
+          const distanceX = Math.abs(enemy.x - positionX);
+          const distanceY = Math.abs(enemy.y - positionY);
           if (distanceX < 5 && distanceY < 20) {
             setPlayerHealth((h) => {
               const newHealth = h - 1;
@@ -656,30 +587,27 @@ export const KnightTest = () => {
     }, 30);
 
     return () => clearInterval(moveInterval);
-  }, [gameState]);
+  }, [positionX, positionY, gameState]);
 
-  // Boss AI
   useEffect(() => {
     if (gameState !== "boss" || !boss) return;
 
     const bossInterval = setInterval(() => {
-      const currentPosX = positionXRef.current;
-      const currentPosY = positionYRef.current;
-
       setBoss((prev) => {
         if (!prev) return null;
         if (Math.abs(prev.knockback) > 0.5 || Math.abs(prev.knockbackY) > 0.5) return prev;
 
-        const dirX = currentPosX > prev.x ? 1 : -1;
-        const dirY = currentPosY > prev.y ? 1 : -1;
+        const dirX = positionX > prev.x ? 1 : -1;
+        const dirY = positionY > prev.y ? 1 : -1;
         const newDirection: Direction = dirX > 0 ? "right" : "left";
 
         const baseSpeed = BOSS_STATS[prev.type].speed * getBossAggressionMultiplier();
         const newX = Math.max(5, Math.min(95, prev.x + dirX * baseSpeed));
         const newY = Math.max(PLAY_AREA_MIN_Y, Math.min(PLAY_AREA_MAX_Y, prev.y + dirY * baseSpeed * 0.7));
 
-        const distanceX = Math.abs(newX - currentPosX);
-        const distanceY = Math.abs(newY - currentPosY);
+        const distanceX = Math.abs(newX - positionX);
+        const distanceY = Math.abs(newY - positionY);
+
         if (distanceX < 10 && distanceY < 30) {
           setPlayerHealth((h) => {
             const damage = prev.type === "fire" ? 5 : 3;
@@ -697,7 +625,7 @@ export const KnightTest = () => {
     }, 50);
 
     return () => clearInterval(bossInterval);
-  }, [gameState, boss, bossLoopCount]);
+  }, [gameState, boss, positionX, positionY, bossLoopCount]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -718,39 +646,37 @@ export const KnightTest = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 overflow-hidden p-4">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900 to-gray-900 flex flex-col items-center justify-center p-4">
       {/* HUD */}
       <div className="w-full max-w-4xl mb-2">
-        <div className="flex justify-between items-center text-white px-4">
-          <div className="flex items-center gap-6">
+        <div className="flex justify-between items-center px-4 py-2 bg-black/50 rounded-lg border border-amber-500/30">
+          <div className="flex items-center gap-4">
             <div className="text-center">
-              <div className="text-orange-400 text-xs font-bold tracking-wider">LEVEL</div>
-              <div className="text-2xl font-bold text-orange-300">{currentLevel}{bossLoopCount > 0 ? `+${bossLoopCount}` : ''}</div>
+              <div className="text-amber-400 text-xs font-bold tracking-wider">LEVEL</div>
+              <div className="text-white text-xl font-bold">{currentLevel}{bossLoopCount > 0 ? `+${bossLoopCount}` : ''}</div>
             </div>
             <div className="text-center">
-              <div className="text-yellow-400 text-xs font-bold tracking-wider">SCORE</div>
-              <div className="text-2xl font-bold text-yellow-300">{score}</div>
+              <div className="text-amber-400 text-xs font-bold tracking-wider">SCORE</div>
+              <div className="text-white text-xl font-bold">{score}</div>
             </div>
           </div>
 
           <div className="text-center">
-            <div className="text-3xl font-bold tracking-[0.3em] text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-red-500 to-orange-400 drop-shadow-lg">
-              FLAME FIGHTERS
-            </div>
+            <div className="text-amber-400 text-2xl font-bold tracking-widest">FLAME FIGHTERS</div>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
             <div className="text-center">
-              <div className="text-red-400 text-xs font-bold tracking-wider">TIME</div>
-              <div className={`text-2xl font-bold ${gameState === "boss" ? "text-red-500 animate-pulse" : "text-red-300"}`}>
+              <div className="text-amber-400 text-xs font-bold tracking-wider">TIME</div>
+              <div className={`text-xl font-bold ${gameState === "boss" ? "text-red-500 animate-pulse" : "text-white"}`}>
                 {gameState === "boss" ? "BOSS!" : formatTime(timeRemaining)}
               </div>
             </div>
             <div className="text-center">
-              <div className="text-green-400 text-xs font-bold tracking-wider">HEALTH</div>
-              <div className="w-24 h-4 bg-gray-700 rounded-full overflow-hidden border border-green-500/50">
+              <div className="text-amber-400 text-xs font-bold tracking-wider">HEALTH</div>
+              <div className="w-24 h-4 bg-gray-700 rounded-full overflow-hidden border border-gray-600">
                 <div
-                  className="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-300"
+                  className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-300"
                   style={{ width: `${playerHealth}%` }}
                 />
               </div>
@@ -761,19 +687,19 @@ export const KnightTest = () => {
 
       {/* Game Area */}
       <div
-        className="relative w-full max-w-4xl aspect-video rounded-lg overflow-hidden shadow-2xl"
+        className="relative overflow-hidden rounded-lg shadow-2xl border-4 border-amber-600"
         style={{
-          boxShadow: '0 0 40px rgba(255, 100, 0, 0.3), inset 0 0 60px rgba(0, 0, 0, 0.5)',
+          width: "800px",
+          height: "500px",
         }}
       >
         {/* Scrolling Background */}
         <div
-          className="absolute inset-0 transition-none"
+          className="absolute inset-0 bg-cover bg-center transition-all duration-100"
           style={{
             backgroundImage: `url(${getCurrentBackground()})`,
-            backgroundSize: 'cover',
             backgroundPosition: `${backgroundOffset}px center`,
-            imageRendering: 'pixelated',
+            backgroundSize: "cover",
           }}
         />
 
@@ -781,11 +707,9 @@ export const KnightTest = () => {
         {gameState === "menu" && (
           <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center z-50">
             <div className="text-center">
-              <h1 className="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-red-500 to-orange-400 mb-4 animate-pulse">
-                FLAME FIGHTERS
-              </h1>
-              <p className="text-orange-300 text-xl mb-8">A Beat 'Em Up Adventure</p>
-              <p className="text-white text-lg animate-bounce">Press SPACE or ENTER to start</p>
+              <h1 className="text-6xl font-bold text-amber-400 mb-4 drop-shadow-lg">FLAME FIGHTERS</h1>
+              <p className="text-2xl text-amber-200 mb-8">A Beat 'Em Up Adventure</p>
+              <p className="text-xl text-white animate-pulse">Press SPACE or ENTER to start</p>
               <div className="mt-8 text-gray-400 text-sm">
                 <p>WASD / Arrow Keys to move</p>
                 <p>C to crouch | SPACE to attack</p>
@@ -799,9 +723,9 @@ export const KnightTest = () => {
           <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center z-50">
             <div className="text-center">
               <h1 className="text-5xl font-bold text-green-400 mb-4">LEVEL {currentLevel} COMPLETE!</h1>
-              <p className="text-yellow-300 text-2xl mb-4">Score: {score}</p>
-              <p className="text-orange-300 text-xl mb-8">Get ready for Level {currentLevel + 1}</p>
-              <p className="text-white text-lg animate-bounce">Press SPACE to continue</p>
+              <p className="text-2xl text-white mb-4">Score: {score}</p>
+              <p className="text-xl text-amber-200 mb-8">Get ready for Level {currentLevel + 1}</p>
+              <p className="text-xl text-white animate-pulse">Press SPACE to continue</p>
             </div>
           </div>
         )}
@@ -811,9 +735,9 @@ export const KnightTest = () => {
           <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-50">
             <div className="text-center">
               <h1 className="text-6xl font-bold text-red-500 mb-4">GAME OVER</h1>
-              <p className="text-yellow-300 text-2xl mb-2">Final Score: {score}</p>
-              <p className="text-orange-300 text-xl mb-8">Level Reached: {currentLevel}</p>
-              <p className="text-white text-lg animate-bounce">Press SPACE to try again</p>
+              <p className="text-2xl text-white mb-2">Final Score: {score}</p>
+              <p className="text-xl text-amber-200 mb-8">Level Reached: {currentLevel}</p>
+              <p className="text-xl text-white animate-pulse">Press SPACE to try again</p>
             </div>
           </div>
         )}
@@ -822,13 +746,13 @@ export const KnightTest = () => {
         {boss && gameState === "boss" && (
           <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-40 w-3/4">
             <div className="text-center mb-1">
-              <span className="text-red-400 font-bold text-sm tracking-wider">
+              <span className="text-red-400 font-bold text-lg drop-shadow-lg">
                 {boss.type === "fire" ? "INFERNO LORD" : "CANDLE DEMON"} - Level {currentLevel} {bossLoopCount > 0 ? `(Loop ${bossLoopCount})` : ''}
               </span>
             </div>
             <div className="w-full h-6 bg-gray-800 rounded-full overflow-hidden border-2 border-red-600">
               <div
-                className="h-full bg-gradient-to-r from-red-700 via-red-500 to-orange-500 transition-all duration-300"
+                className="h-full bg-gradient-to-r from-red-700 via-red-500 to-orange-500 transition-all duration-200"
                 style={{ width: `${(boss.health / boss.maxHealth) * 100}%` }}
               />
             </div>
@@ -839,12 +763,12 @@ export const KnightTest = () => {
         {scorePopups.map((popup) => (
           <div
             key={popup.id}
-            className="absolute text-yellow-300 font-bold text-xl animate-bounce z-30 pointer-events-none"
+            className="absolute text-yellow-300 font-bold text-2xl animate-bounce pointer-events-none"
             style={{
               left: `${popup.x}%`,
               bottom: `${getBottomPosition(popup.y)}px`,
-              transform: 'translateX(-50%)',
-              animation: 'fadeUp 0.8s ease-out forwards',
+              zIndex: 100,
+              animation: "fadeUp 0.8s ease-out forwards",
             }}
           >
             +{popup.value}
@@ -855,50 +779,35 @@ export const KnightTest = () => {
         {enemies.map((enemy) => (
           <div
             key={enemy.id}
-            className={`absolute transition-none ${enemy.isHurt ? 'brightness-200' : ''}`}
+            className="absolute transition-all duration-75"
             style={{
               left: `${enemy.x}%`,
               bottom: `${getBottomPosition(enemy.y)}px`,
               transform: `translateX(-50%) scaleX(${enemy.direction === "left" ? -1 : 1}) scale(${getDepthScale(enemy.y)})`,
               zIndex: getZIndex(enemy.y),
-              imageRendering: 'pixelated',
+              filter: enemy.isHurt ? "brightness(2) saturate(0)" : "none",
             }}
           >
-            <img
-              src={fireEnemy}
-              alt="Fire Enemy"
-              className="h-16 w-auto"
-              style={{ imageRendering: 'pixelated' }}
-            />
+            <img src={fireEnemy} alt="Fire Enemy" className="w-16 h-16 object-contain" />
           </div>
         ))}
 
         {/* Boss */}
         {boss && (
           <div
-            className={`absolute transition-none ${boss.isHurt ? 'brightness-200' : ''}`}
+            className="absolute transition-all duration-100"
             style={{
               left: `${boss.x}%`,
               bottom: `${getBottomPosition(boss.y)}px`,
               transform: `translateX(-50%) scaleX(${boss.direction === "left" ? -1 : 1}) scale(${getDepthScale(boss.y) * 1.5})`,
               zIndex: getZIndex(boss.y),
-              imageRendering: 'pixelated',
+              filter: boss.isHurt ? "brightness(2) saturate(0)" : "none",
             }}
           >
             {boss.type === "candle" ? (
-              <img
-                src={boss.direction === "left" ? candleEnemyLeft : candleEnemyRight}
-                alt="Candle Boss"
-                className="h-32 w-auto"
-                style={{ imageRendering: 'pixelated' }}
-              />
+              <img src={boss.direction === "left" ? candleEnemyLeft : candleEnemyRight} alt="Candle Boss" className="w-32 h-32 object-contain" />
             ) : (
-              <img
-                src={fireBoss}
-                alt="Fire Boss"
-                className="h-40 w-auto"
-                style={{ imageRendering: 'pixelated' }}
-              />
+              <img src={fireBoss} alt="Fire Boss" className="w-40 h-40 object-contain" />
             )}
           </div>
         )}
@@ -906,67 +815,55 @@ export const KnightTest = () => {
         {/* Defeated Boss Dissolving Animation */}
         {defeatedBoss && defeatedBoss.type === "candle" && (
           <div
-            className="absolute transition-none"
+            className="absolute pointer-events-none"
             style={{
               left: `${defeatedBoss.x}%`,
               bottom: `${getBottomPosition(defeatedBoss.y)}px`,
               transform: `translateX(-50%) scale(${getDepthScale(defeatedBoss.y) * 1.5})`,
-              zIndex: getZIndex(defeatedBoss.y),
-              imageRendering: 'pixelated',
+              zIndex: getZIndex(defeatedBoss.y) + 10,
             }}
           >
-            <img
-              src={`${candleDissolvingGif}?t=${defeatedBoss.timestamp}`}
-              alt="Candle Dissolving"
-              className="h-32 w-auto"
-              style={{ imageRendering: 'pixelated' }}
-            />
+            <img src={candleDissolvingGif} alt="Dissolving" className="w-32 h-32 object-contain" />
           </div>
         )}
 
         {/* Character */}
         {(gameState === "playing" || gameState === "boss") && (
           <div
-            className="absolute transition-none"
+            className="absolute transition-all duration-75"
             style={{
               left: `${positionX}%`,
               bottom: `${getBottomPosition(positionY) + currentYOffset}px`,
               transform: `translateX(-50%) scale(${currentScale * getDepthScale(positionY)})`,
               zIndex: getZIndex(positionY),
-              imageRendering: 'pixelated',
             }}
           >
-            <img
-              src={currentAnimation}
-              alt="Knight"
-              className="h-16 w-auto"
-              style={{ imageRendering: 'pixelated' }}
-            />
+            <img src={currentAnimation} alt="Knight" className="w-16 h-16 object-contain" />
           </div>
         )}
       </div>
 
       {/* Controls */}
-      <div className="mt-4 text-gray-400 text-sm">
-        <div className="flex flex-wrap justify-center gap-4">
+      <div className="mt-4 text-center">
+        <div className="flex gap-6 justify-center text-gray-400 text-sm">
           <div className="flex items-center gap-2">
-            <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">WASD / ← → ↑ ↓</kbd>
+            <kbd className="px-2 py-1 bg-gray-700 rounded text-white">WASD / ← → ↑ ↓</kbd>
             <span>Move</span>
           </div>
           <div className="flex items-center gap-2">
-            <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">C</kbd>
+            <kbd className="px-2 py-1 bg-gray-700 rounded text-white">C</kbd>
             <span>Toggle Crouch</span>
           </div>
           <div className="flex items-center gap-2">
-            <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Space</kbd>
+            <kbd className="px-2 py-1 bg-gray-700 rounded text-white">Space</kbd>
             <span>Attack</span>
           </div>
           <div className="flex items-center gap-2">
-            <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">↑ / W</kbd>
+            <kbd className="px-2 py-1 bg-gray-700 rounded text-white">↑ / W</kbd>
             <span>Move Back</span>
           </div>
           <div className="flex items-center gap-2">
-            <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">↓ / S</kbd>
+            <kbd className="px-2 py-1 bg-gray-700 rounded text-white">↓ / S</kbd>
             <span>Move Front</span>
           </div>
         </div>
@@ -974,8 +871,8 @@ export const KnightTest = () => {
 
       <style>{`
         @keyframes fadeUp {
-          0% { opacity: 1; transform: translateX(-50%) translateY(0); }
-          100% { opacity: 0; transform: translateX(-50%) translateY(-40px); }
+          0% { opacity: 1; transform: translateY(0); }
+          100% { opacity: 0; transform: translateY(-40px); }
         }
       `}</style>
     </div>
