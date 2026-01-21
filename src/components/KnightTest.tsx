@@ -709,10 +709,7 @@ export const KnightTest = () => {
     return Math.floor(200 - y);
   };
 
-  // Calculate scale based on Y for depth effect (further = smaller)
-  const getDepthScale = (y: number) => {
-    return 0.8 + (y / PLAY_AREA_MAX_Y) * 0.4;
-  };
+ 
 
   return (
     <div className="min-h-screen bg-game flex flex-col overflow-hidden">
