@@ -508,45 +508,56 @@ export const KnightTest = () => {
     }
   }, [keys, isAttacking, isCrouching, gameState]);
 
-  // Game loop for movement and knockback recovery
+  // Game loop for movement and knockback recovery using requestAnimationFrame
   useEffect(() => {
     if (gameState !== "playing" && gameState !== "boss") return;
 
-    const interval = setInterval(() => {
+    let animationId: number;
+    let lastTime = performance.now();
+    const targetFPS = 60;
+    const frameTime = 1000 / targetFPS;
+
+    const gameLoop = (currentTime: number) => {
+      const deltaTime = currentTime - lastTime;
+      
+      // Scale movement by delta time for consistent speed regardless of frame rate
+      const timeScale = deltaTime / frameTime;
+      
       const isMovingLeft = keys.has("arrowleft") || keys.has("a");
       const isMovingRight = keys.has("arrowright") || keys.has("d");
       const isMovingUp = keys.has("arrowup") || keys.has("w");
       const isMovingDown = keys.has("arrowdown") || keys.has("s");
 
-      const moveSpeed = isCrouching ? 0.5 : 1;
+      const baseMoveSpeed = isCrouching ? 0.5 : 1;
+      const moveSpeed = baseMoveSpeed * timeScale;
 
       if (!isAttacking) {
         // Horizontal movement
         if (isMovingLeft) {
           setPositionX((prev) => Math.max(5, prev - moveSpeed));
-          setBackgroundOffset((prev) => prev + 2);
+          setBackgroundOffset((prev) => prev + 2 * timeScale);
         }
         if (isMovingRight) {
           setPositionX((prev) => Math.min(95, prev + moveSpeed));
-          setBackgroundOffset((prev) => prev - 2);
+          setBackgroundOffset((prev) => prev - 2 * timeScale);
         }
         
-        // Vertical movement (isometric Y) - same speed as horizontal
+        // Vertical movement (isometric Y)
         if (isMovingUp) {
-           setPositionY((prev) => Math.min(PLAY_AREA_MAX_Y, prev + moveSpeed));
+          setPositionY((prev) => Math.min(PLAY_AREA_MAX_Y, prev + moveSpeed));
         }
         if (isMovingDown) {
-           setPositionY((prev) => Math.max(PLAY_AREA_MIN_Y, prev - moveSpeed));
+          setPositionY((prev) => Math.max(PLAY_AREA_MIN_Y, prev - moveSpeed));
         }
       }
 
       // Recover enemy knockback
       setEnemies((prev) => prev.map((enemy) => ({
         ...enemy,
-        x: Math.max(0, Math.min(100, enemy.x + enemy.knockback)),
-        y: Math.max(PLAY_AREA_MIN_Y, Math.min(PLAY_AREA_MAX_Y, enemy.y + enemy.knockbackY)),
-        knockback: Math.abs(enemy.knockback) < 0.1 ? 0 : enemy.knockback * (1 - KNOCKBACK_RECOVERY),
-        knockbackY: Math.abs(enemy.knockbackY) < 0.1 ? 0 : enemy.knockbackY * (1 - KNOCKBACK_RECOVERY),
+        x: Math.max(0, Math.min(100, enemy.x + enemy.knockback * timeScale)),
+        y: Math.max(PLAY_AREA_MIN_Y, Math.min(PLAY_AREA_MAX_Y, enemy.y + enemy.knockbackY * timeScale)),
+        knockback: Math.abs(enemy.knockback) < 0.1 ? 0 : enemy.knockback * Math.pow(1 - KNOCKBACK_RECOVERY, timeScale),
+        knockbackY: Math.abs(enemy.knockbackY) < 0.1 ? 0 : enemy.knockbackY * Math.pow(1 - KNOCKBACK_RECOVERY, timeScale),
       })));
 
       // Recover boss knockback
@@ -554,22 +565,35 @@ export const KnightTest = () => {
         if (!prev) return null;
         return {
           ...prev,
-          x: Math.max(5, Math.min(95, prev.x + prev.knockback)),
-          y: Math.max(PLAY_AREA_MIN_Y, Math.min(PLAY_AREA_MAX_Y, prev.y + prev.knockbackY)),
-          knockback: Math.abs(prev.knockback) < 0.1 ? 0 : prev.knockback * (1 - KNOCKBACK_RECOVERY),
-          knockbackY: Math.abs(prev.knockbackY) < 0.1 ? 0 : prev.knockbackY * (1 - KNOCKBACK_RECOVERY),
+          x: Math.max(5, Math.min(95, prev.x + prev.knockback * timeScale)),
+          y: Math.max(PLAY_AREA_MIN_Y, Math.min(PLAY_AREA_MAX_Y, prev.y + prev.knockbackY * timeScale)),
+          knockback: Math.abs(prev.knockback) < 0.1 ? 0 : prev.knockback * Math.pow(1 - KNOCKBACK_RECOVERY, timeScale),
+          knockbackY: Math.abs(prev.knockbackY) < 0.1 ? 0 : prev.knockbackY * Math.pow(1 - KNOCKBACK_RECOVERY, timeScale),
         };
       });
-    }, 30);
 
-    return () => clearInterval(interval);
+      lastTime = currentTime;
+      animationId = requestAnimationFrame(gameLoop);
+    };
+
+    animationId = requestAnimationFrame(gameLoop);
+
+    return () => cancelAnimationFrame(animationId);
   }, [keys, isAttacking, isCrouching, gameState]);
 
-  // Move enemies toward player
+  // Move enemies toward player using requestAnimationFrame
   useEffect(() => {
     if (gameState !== "playing" && gameState !== "boss") return;
 
-    const moveInterval = setInterval(() => {
+    let animationId: number;
+    let lastTime = performance.now();
+    const targetFPS = 60;
+    const frameTime = 1000 / targetFPS;
+
+    const enemyLoop = (currentTime: number) => {
+      const deltaTime = currentTime - lastTime;
+      const timeScale = deltaTime / frameTime;
+
       setEnemies((prev) =>
         prev.map((enemy) => {
           if (Math.abs(enemy.knockback) > 0.5 || Math.abs(enemy.knockbackY) > 0.5) return enemy;
@@ -578,11 +602,11 @@ export const KnightTest = () => {
           const dirY = positionY > enemy.y ? 1 : -1;
           const newDirection: Direction = dirX > 0 ? "right" : "left";
           
-          // Move toward player in both X and Y
+          // Move toward player in both X and Y with delta time scaling
           return { 
             ...enemy, 
-            x: Math.max(0, Math.min(100, enemy.x + dirX * enemy.speed)),
-            y: Math.max(PLAY_AREA_MIN_Y, Math.min(PLAY_AREA_MAX_Y, enemy.y + dirY * enemy.speed * 0.7)),
+            x: Math.max(0, Math.min(100, enemy.x + dirX * enemy.speed * timeScale)),
+            y: Math.max(PLAY_AREA_MIN_Y, Math.min(PLAY_AREA_MAX_Y, enemy.y + dirY * enemy.speed * 0.7 * timeScale)),
             direction: newDirection,
           };
         })
@@ -595,7 +619,7 @@ export const KnightTest = () => {
           const distanceY = Math.abs(enemy.y - positionY);
           if (distanceX < 5 && distanceY < 20) {
             setPlayerHealth((h) => {
-              const newHealth = h - 1; // Fire enemies do 1 damage
+              const newHealth = h - 1;
               if (newHealth <= 0) {
                 setGameState("game-over");
                 return 0;
@@ -606,16 +630,29 @@ export const KnightTest = () => {
         });
         return prev;
       });
-    }, 30);
 
-    return () => clearInterval(moveInterval);
+      lastTime = currentTime;
+      animationId = requestAnimationFrame(enemyLoop);
+    };
+
+    animationId = requestAnimationFrame(enemyLoop);
+
+    return () => cancelAnimationFrame(animationId);
   }, [positionX, positionY, gameState]);
 
-  // Boss AI
+  // Boss AI using requestAnimationFrame
   useEffect(() => {
     if (gameState !== "boss" || !boss) return;
 
-    const bossInterval = setInterval(() => {
+    let animationId: number;
+    let lastTime = performance.now();
+    const targetFPS = 60;
+    const frameTime = 1000 / targetFPS;
+
+    const bossLoop = (currentTime: number) => {
+      const deltaTime = currentTime - lastTime;
+      const timeScale = deltaTime / frameTime;
+
       setBoss((prev) => {
         if (!prev) return null;
         
@@ -624,8 +661,8 @@ export const KnightTest = () => {
         const dirX = positionX > prev.x ? 1 : -1;
         const dirY = positionY > prev.y ? 1 : -1;
         const newDirection: Direction = dirX > 0 ? "right" : "left";
-        // Slow boss movement based on type
-        const baseSpeed = BOSS_STATS[prev.type].speed * getBossAggressionMultiplier();
+        // Slow boss movement based on type with delta time scaling
+        const baseSpeed = BOSS_STATS[prev.type].speed * getBossAggressionMultiplier() * timeScale;
         const newX = Math.max(5, Math.min(95, prev.x + dirX * baseSpeed));
         const newY = Math.max(PLAY_AREA_MIN_Y, Math.min(PLAY_AREA_MAX_Y, prev.y + dirY * baseSpeed * 0.7));
         
@@ -633,7 +670,7 @@ export const KnightTest = () => {
         const distanceY = Math.abs(newY - positionY);
         if (distanceX < 10 && distanceY < 30) {
           setPlayerHealth((h) => {
-            const damage = prev.type === "fire" ? 5 : 3; // Fire boss does more damage
+            const damage = prev.type === "fire" ? 5 : 3;
             const newHealth = h - damage * getBossAggressionMultiplier();
             if (newHealth <= 0) {
               setGameState("game-over");
@@ -645,9 +682,14 @@ export const KnightTest = () => {
         
         return { ...prev, x: newX, y: newY, direction: newDirection };
       });
-    }, 50);
 
-    return () => clearInterval(bossInterval);
+      lastTime = currentTime;
+      animationId = requestAnimationFrame(bossLoop);
+    };
+
+    animationId = requestAnimationFrame(bossLoop);
+
+    return () => cancelAnimationFrame(animationId);
   }, [gameState, boss, positionX, positionY, bossLoopCount]);
 
   const formatTime = (seconds: number) => {
