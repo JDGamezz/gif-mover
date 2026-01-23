@@ -732,7 +732,7 @@ export const KnightTest = () => {
         </div>
         
         <h1 className="text-xl font-bold text-game-text font-pixel tracking-wider">
-          FLAME FIGHTERS1
+          Please Enter Full-Screen For Best Experience
         </h1>
         
         <div className="flex items-center gap-6">
