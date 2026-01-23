@@ -163,7 +163,7 @@ export const KnightTest = () => {
   
   const enemyIdRef = useRef(0);
   const popupIdRef = useRef(0);
-  const spawnTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const spawnTimerRef = useRef<number | null>(null);
   const mainMusicRef = useRef<HTMLAudioElement | null>(null);
   const bossMusicRef = useRef<HTMLAudioElement | null>(null);
 
